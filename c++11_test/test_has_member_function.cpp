@@ -115,6 +115,20 @@ void print(T&&...t){
     print(forward<T>(t)...);
 }
 
+HAS_MEMBER_FUNCTION(begin);
+template<typename T, template<class,class...> class C, class... Args, typename enable_if<!is_same<C<T,Args...>,string>::value && has_member_begin<C<T,Args...>>::value>::type* = nullptr>
+std::ostream& operator <<(std::ostream& os, const C<T,Args...>& objs)
+{
+#ifdef WIN32
+    std::cout << __FUNCTION__ << '\n';
+#else
+    std::cout << __PRETTY_FUNCTION__ << '\n';
+#endif
+    for (auto const& obj : objs)
+        os << obj << ' ';
+    return os;
+}
+
 int main() {
     string s = "sddds";
     cout << str<string>(s) << endl;
