@@ -8,6 +8,9 @@
 #include <iostream>
 #include <tuple>
 
+// C++11 tuple implementation details (Part 1)
+// http://mitchnull.blogspot.com/2012/06/c11-tuple-implementation-details-part-1.html
+
 using namespace std;
 
 // 1.可变参数函数模板
