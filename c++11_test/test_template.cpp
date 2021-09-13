@@ -5,7 +5,7 @@
 #include <iostream>
 #include <typeinfo>
 
-#include "./src/<template....T>.h"
+#include "./src/template....T.h"
 #include "./src/student.h"
 
 using namespace std;
