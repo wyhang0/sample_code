@@ -9,6 +9,8 @@
 #include <mutex>
 #include <iostream>
 
+//https://nwcpp.org/talks/2004/DCLP_notes.pdf
+
 using namespace std;
 
 template<typename T>
