@@ -18,13 +18,17 @@ class Singleton final {
 public:
     template<typename ...Args>
     static T* instance(Args&&...args){
-        if(m_instance == nullptr){
-            std::lock_guard<std::mutex> locker{m_mutex};
-            if(m_instance == nullptr){
-                unique_ptr<T> tmp(new T{forward<Args>(args)...});
-                m_instance = std::move(tmp);
-            }
-        }
+//         if(m_instance == nullptr){
+//             std::lock_guard<std::mutex> locker{m_mutex};
+//             if(m_instance == nullptr){
+//                 unique_ptr<T> tmp(new T{forward<Args>(args)...});
+//                 m_instance = std::move(tmp);
+//             }
+//         }
+//         return m_instance.get();
+        
+        static std::once_flag of;
+        std::call_once(of, [&]{ m_instance = unique_ptr<T>{new T(forward<Args>(args)...)}; });
         return m_instance.get();
     }
 
