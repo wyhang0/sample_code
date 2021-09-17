@@ -3,6 +3,11 @@ project(c__11_test)
 
 set(CMAKE_CXX_STANDARD 11)
 
+if(WIN32)
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+endif()
+
 add_subdirectory(./sqlite3-cmake-master)
 
 include_directories(./sqlite3-cmake-master/src)
