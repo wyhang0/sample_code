@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package Test;
+
+enum PathFreq {
+	HKLM=0;
+	HKCU=1;
+	HKCR=2;
+	HKU=3;
+	HKCC=4;
+	MODEL=5;
+	PRINTERNAME=6;
+	//SOFTWARE\Microsoft\Windows NT\CurrentVersion\Print\Printers
+	SMWCP=7;
+	resevered8=8;
+	resevered9=9;
+	resevered10=10;
+	resevered11=11;
+	resevered12=12;
+	resevered13=13;
+	resevered14=14;
+	resevered15=15;
+	resevered16=16;
+}
+
+message MsgPathUnit {
+	 oneof PathUnit {
+		PathFreq freq = 1;
+		string normal = 2;
+	};
+}
+
+message Path {repeated MsgPathUnit unit=1;}
+
+message MapPath {map<uint32, Path> Config=1;}
+
+message Paths {repeated uint32 p = 1;}
+
+message MapConfig {map<string, Paths> Config = 1;}
+
+message SpecConfig {
+	string s = 1; 
+	MapPath mappath = 2;
+	MapConfig mapconfig = 3;
+}
