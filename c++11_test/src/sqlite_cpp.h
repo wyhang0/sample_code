@@ -20,6 +20,11 @@ struct blob
 {
     const char *pBuf;
     size_t size;
+    
+    // sql获取blob数据后转换为string防止sqlite3_stmt重置后，pBuf指向非法内存
+    string toString(){
+        return {pBuf, size};
+    }
 };
 
 class SqliteCpp : NonCopyable {
