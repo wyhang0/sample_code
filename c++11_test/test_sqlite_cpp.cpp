@@ -30,9 +30,15 @@ int main(){
         sql = "insert into t1 values(?,?,?);";
         string str{"wseg"};
         double d[10];
+        srand(system_clock::now().time_since_epoch().count());
         for (int i = 0; i < sizeof(d) / sizeof(double); ++i) {
             d[i] = rand()*1.0/rand()*100;
         }
+        for(int i=0; i<sizeof(d) / sizeof(double); i++){
+            cout << d[i] << '\t';
+        }
+        cout << endl;
+        
         auto spectrum = Big_Endian_Convert<double>::convert_to_string(d, sizeof(d)/sizeof(double));
         cout << strlen(spectrum.data()) << endl;
         //　开启事务,提高插入速度
@@ -53,8 +59,14 @@ int main(){
             break;
         while (db.next()){
             cout << db.get<string>(0) << " " << db.get<int>(1) << endl;
-            blob b = db.get<blob>(2);
-            Big_Endian_Convert<double>::convert_from_string({b.pBuf, b.size}, d, sizeof(d)/sizeof(double));
+            string blob_str = db.get<blob>(2).toString();
+
+            memset(d, 0, sizeof d);
+            Big_Endian_Convert<double>::convert_from_string(blob_str, d, sizeof(d)/sizeof(double));
+            for(int i=0; i<sizeof(d) / sizeof(double); i++){
+                cout << d[i] << '\t';
+            }
+            cout << endl;
         }
     } while (false);
     return 0;
