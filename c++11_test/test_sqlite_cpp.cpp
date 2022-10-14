@@ -91,25 +91,25 @@ int main(){
                         cout << this_thread::get_id() << " exec" << endl;
                         execute->begin();
                         for (int i = 0, j = 1; i < 5; ++i) {
-                            School meterConf;
-                            meterConf.id = random();
-                            meterConf.name = to_string(j++);
-                            meterConf.addr = j++;
-                            meterConf.phone = j++;
+                            School school;
+                            school.id = random();
+                            school.name = to_string(j++);
+                            school.addr = j++;
+                            school.phone = j++;
 
-                            Student tagConf;
-                            tagConf.id = random();
-                            tagConf.name = to_string(j++);
-                            tagConf.addr = to_string(j++);
-                            tagConf.phone = j++;
-                            tagConf.schoolId = j++;
+                            Student student;
+                            student.id = random();
+                            student.name = to_string(j++);
+                            student.addr = to_string(j++);
+                            student.phone = j++;
+                            student.schoolId = school.id;
 
-                            if(!execute->execute(sqlStatementConstructor.insertOrReplaceSqlStr(meterConf))){
+                            if(!execute->execute(sqlStatementConstructor.insertOrReplaceSqlStr(school))){
                                 cout << execute->getLastError() << endl;
                                 execute->rollBack();
                                 break;
                             }
-                            if(!execute->execute(sqlStatementConstructor.insertOrReplaceSqlStr(tagConf))){
+                            if(!execute->execute(sqlStatementConstructor.insertOrReplaceSqlStr(student))){
                                 cout << execute->getLastError() << endl;
                                 execute->rollBack();
                                 break;
@@ -121,18 +121,18 @@ int main(){
                 auto queryFunc = [sqlConnectionPool](){
                     SqlStatementConstructor sqlStatementConstructor;
                     for (int i = 0; i < 500; ++i) {
-                        vector<boost::shared_ptr<Student>> tagConfV;
-                        vector<boost::shared_ptr<School>> meterConfV;
+                        vector<boost::shared_ptr<Student>> studentV;
+                        vector<boost::shared_ptr<School>> schoolV;
 
                         auto query = sqlConnectionPool->getQueryConnection();
                         if(!query)
                             continue;
                         cout << this_thread::get_id() << " query" << endl;
-                        if(!query->querySql(meterConfV, sqlStatementConstructor.selectSqlStr<School>(sqlStatementConstructor.sqlQueryAndConditions("like", "name", "%12%")))){
+                        if(!query->querySql(schoolV, sqlStatementConstructor.selectSqlStr<School>(sqlStatementConstructor.sqlQueryAndConditions("like", "name", "%12%")))){
                             cout << "err: " << query->getLastError() << endl;
                             break;
                         }
-                        if(!query->querySql(tagConfV, sqlStatementConstructor.selectSqlStr<Student>(sqlStatementConstructor.sqlQueryAndConditions("like", "id", "%12")))){
+                        if(!query->querySql(studentV, sqlStatementConstructor.selectSqlStr<Student>(sqlStatementConstructor.sqlQueryAndConditions("like", "id", "%12")))){
                             cout << "err: " << query->getLastError() << endl;
                             break;
                         }
@@ -153,7 +153,6 @@ int main(){
             cout << endl;
         }while(false);
 
-        return 0;
     }
     {
         do{
@@ -189,25 +188,25 @@ int main(){
 
             conn.begin();
             for (int i = 0, j = 1; i < 60000; ++i) {
-                School meterConf;
-                meterConf.id = j++;
-                meterConf.name = to_string(j++);
-                meterConf.addr = to_string(j++);
-                meterConf.phone = j++;
+                School school;
+                school.id = j++;
+                school.name = to_string(j++);
+                school.addr = to_string(j++);
+                school.phone = j++;
 
-                Student tagConf;
-                tagConf.id = j++;
-                tagConf.name = to_string(j++);
-                tagConf.addr = to_string(j++);
-                tagConf.phone = j++;
-                tagConf.schoolId = j++;
+                Student student;
+                student.id = j++;
+                student.name = to_string(j++);
+                student.addr = to_string(j++);
+                student.phone = j++;
+                student.schoolId = school.id;
 
-                if(!conn.execute(sqlStatementConstructor.insertOrReplaceSqlStr(meterConf))){
+                if(!conn.execute(sqlStatementConstructor.insertOrReplaceSqlStr(school))){
                     cout << conn.getLastError() << endl;
                     conn.rollBack();
                     break;
                 }
-                if(!conn.execute(sqlStatementConstructor.insertOrReplaceSqlStr(tagConf))){
+                if(!conn.execute(sqlStatementConstructor.insertOrReplaceSqlStr(student))){
                     cout << conn.getLastError() << endl;
                     conn.rollBack();
                     break;
@@ -225,17 +224,17 @@ int main(){
                 break;
             }
 
-            vector<boost::shared_ptr<Student>> tagConfV;
-            vector<boost::shared_ptr<School>> meterConfV;
-            if(!conn.querySql(tagConfV, sqlStatementConstructor.selectSqlStr<Student>(""))){
+            vector<boost::shared_ptr<Student>> studentV;
+            vector<boost::shared_ptr<School>> schoolV;
+            if(!conn.querySql(studentV, sqlStatementConstructor.selectSqlStr<Student>(""))){
                 cout << "err: " << conn.getLastError() << endl;
                 break;
             }
-            if(!conn.querySql(meterConfV, sqlStatementConstructor.selectSqlStr<School>(sqlStatementConstructor.sqlQueryAndConditions("like", "name", "%12%")))){
+            if(!conn.querySql(schoolV, sqlStatementConstructor.selectSqlStr<School>(sqlStatementConstructor.sqlQueryAndConditions("like", "name", "%12%")))){
                 cout << "err: " << conn.getLastError() << endl;
                 break;
             }
-            if(!conn.querySql(meterConfV, sqlStatementConstructor.selectSqlStr<School>(""))){
+            if(!conn.querySql(schoolV, sqlStatementConstructor.selectSqlStr<School>(""))){
                 cout << "err: " << conn.getLastError() << endl;
                 break;
             }
