@@ -38,9 +38,18 @@ public:
     }
 
     bool open(const string &fileName){
+        if(sqlite3_threadsafe() != SQLITE_CONFIG_MULTITHREAD){
+            sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
+        }
+
         if(m_dbHandle != nullptr)
             return true;
+
         m_code = sqlite3_open(fileName.c_str(), &m_dbHandle);
+
+        sqlite3_exec(m_dbHandle, "PRAGMA foreign_keys = 1;", 0,0,0);
+        sqlite3_exec(m_dbHandle, "PRAGMA auto_vacuum = 0;", 0,0,0);
+
         return m_code == SQLITE_OK;
     }
 
@@ -123,6 +132,9 @@ public:
     int getLastErrorCode(){
         return m_code;
     }
+    string getLastError(){
+        return sqlite3_errstr(m_code);
+    }
 
 protected:
     int closeDbHandle(){
@@ -187,15 +199,20 @@ protected:
 
     template<typename R, typename enable_if<is_floating_point<R>::value>::type* = nullptr>
     R columnValue(int index){
-        if(sqlite3_column_type(m_statement, index) != SQLITE_FLOAT)
+        if(sqlite3_column_type(m_statement, index) != SQLITE_FLOAT){
+            cout << __FILE__ << " " << __LINE__ << ": type error" << endl;
             throw bad_cast();
+        }
 
         return sqlite3_column_double(m_statement, index);
     }
     template<typename R, typename enable_if<is_integral<R>::value>::type* = nullptr>
     R columnValue(int index){
-        if(sqlite3_column_type(m_statement, index) != SQLITE_INTEGER)
+        int type = sqlite3_column_type(m_statement, index);
+        if(sqlite3_column_type(m_statement, index) != SQLITE_INTEGER){
+            cout << __FILE__ << " " << __LINE__ << ": type error" << endl;
             throw bad_cast();
+        }
 
         return columnIntValue<R>(index);
     }
@@ -209,8 +226,11 @@ protected:
     }
     template<typename R, typename enable_if<is_same<R, string>::value>::type* = nullptr>
     R columnValue(int index){
-        if(sqlite3_column_type(m_statement, index) != SQLITE_TEXT)
+        auto type = sqlite3_column_type(m_statement, index);
+        if(type != SQLITE_TEXT && type != SQLITE_BLOB){
+            cout << __FILE__ << " " << __LINE__ << ": type error" << endl;
             throw bad_cast();
+        }
 
         auto tmp = sqlite3_column_text(m_statement, index);
         size_t size = sqlite3_column_bytes(m_statement, index);
@@ -218,8 +238,11 @@ protected:
     }
     template<typename R, typename enable_if<is_same<R, blob>::value>::type* = nullptr>
     R columnValue(int index){
-        if(sqlite3_column_type(m_statement, index) != SQLITE_BLOB)
+        auto type = sqlite3_column_type(m_statement, index);
+        if(type != SQLITE_BLOB && type != SQLITE_TEXT){
+            cout << __FILE__ << " " << __LINE__ << ": type error" << endl;
             throw bad_cast();
+        }
 
         auto tmp = sqlite3_column_blob(m_statement, index);
         size_t size = sqlite3_column_bytes(m_statement, index);
