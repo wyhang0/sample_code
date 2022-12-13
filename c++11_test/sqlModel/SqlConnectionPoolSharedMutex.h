@@ -8,9 +8,9 @@
 #include <shared_mutex>
 #include <mutex>
 #include <queue>
-#include <boost/shared_ptr.hpp>
-#include <boost/noncopyable.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <memory>
+
+#include "../src/non_copyable.h"
 
 /**
  * sql连接随用随取，不要长时间占用一个连接，否则会由于读写锁未释放造成后续获取连接失败.
@@ -18,12 +18,12 @@
  * @tparam SqlConnectionPoolSharedMutex
  */
 template<class SqlConnection>
-class SqlConnectionPoolSharedMutex : public boost::enable_shared_from_this<SqlConnectionPoolSharedMutex<SqlConnection>>, public boost::noncopyable {
+class SqlConnectionPoolSharedMutex : public std::enable_shared_from_this<SqlConnectionPoolSharedMutex<SqlConnection>>, public NonCopyable {
 public:
     template<typename ...Args>
     SqlConnectionPoolSharedMutex(int num, Args &&...args){
         for(int i=0; i < num; i++){
-            boost::shared_ptr<SqlConnection> sqlConnection(new SqlConnection(std::forward<Args>(args)...), [](SqlConnection *p){}); //在析构函数释放内存
+            std::shared_ptr<SqlConnection> sqlConnection(new SqlConnection(std::forward<Args>(args)...), [](SqlConnection *p){}); //在析构函数释放内存
             sqlConnections.push(sqlConnection);
         }
     }
@@ -35,7 +35,7 @@ public:
         }
     }
 
-    boost::shared_ptr<SqlConnection> getExecuteConnection(int millSeconds = 0){
+    std::shared_ptr<SqlConnection> getExecuteConnection(int millSeconds = 0){
         do{
             if(millSeconds <= 0){
                 millSeconds = INT_MAX;
@@ -53,17 +53,17 @@ public:
             }
 
             if(sharedTimedMutex.try_lock_for(std::chrono::milliseconds(millSeconds))){
-                boost::shared_ptr<SqlConnection> tmp;
+                std::shared_ptr<SqlConnection> tmp;
                 {
                     std::lock_guard<std::mutex> locker(mutex);
                     tmp = sqlConnections.front();
                     sqlConnections.pop();
                 }
                 auto mirror = this->shared_from_this();
-                return boost::shared_ptr<SqlConnection>(tmp.get(), [mirror, this](SqlConnection *p){
+                return std::shared_ptr<SqlConnection>(tmp.get(), [mirror, this](SqlConnection *p){
                     {
                         std::lock_guard<std::mutex> locker(mutex);
-                        sqlConnections.push(boost::shared_ptr<SqlConnection>(p, [](SqlConnection *p) {}));
+                        sqlConnections.push(std::shared_ptr<SqlConnection>(p, [](SqlConnection *p) {}));
                         sharedTimedMutex.unlock();
                         //释放完写锁计数减一
                         getExecuteConnectionCount--;
@@ -89,10 +89,10 @@ public:
         }
 
 
-        return boost::shared_ptr<SqlConnection>();
+        return std::shared_ptr<SqlConnection>();
     }
 
-    boost::shared_ptr<SqlConnection> getQueryConnection(int millSeconds = 0){
+    std::shared_ptr<SqlConnection> getQueryConnection(int millSeconds = 0){
         do{
             if(millSeconds <= 0){
                 millSeconds = INT_MAX;
@@ -107,17 +107,17 @@ public:
             }
 
             if(sharedTimedMutex.try_lock_shared_for(std::chrono::milliseconds(millSeconds))){
-                boost::shared_ptr<SqlConnection> tmp;
+                std::shared_ptr<SqlConnection> tmp;
                 {
                     std::lock_guard<std::mutex> locker(mutex);
                     tmp = sqlConnections.front();
                     sqlConnections.pop();
                 }
                 auto mirror = this->shared_from_this();
-                return boost::shared_ptr<SqlConnection>(tmp.get(), [mirror, this](SqlConnection *p){
+                return std::shared_ptr<SqlConnection>(tmp.get(), [mirror, this](SqlConnection *p){
                     {
                         std::lock_guard<std::mutex> locker(mutex);
-                        sqlConnections.push(boost::shared_ptr<SqlConnection>(p, [](SqlConnection *p) {}));
+                        sqlConnections.push(std::shared_ptr<SqlConnection>(p, [](SqlConnection *p) {}));
                         sharedTimedMutex.unlock_shared();
                         if(getExecuteConnectionCount > 0){
                             execCond.notify_one();
@@ -138,11 +138,11 @@ public:
             }
         }
 
-        return boost::shared_ptr<SqlConnection>();
+        return std::shared_ptr<SqlConnection>();
     }
 
 private:
-    std::queue<boost::shared_ptr<SqlConnection>> sqlConnections;
+    std::queue<std::shared_ptr<SqlConnection>> sqlConnections;
 
     //确保只能获取一个sql写连接，可以获取多个sql读连接
     int getExecuteConnectionCount = 0;
@@ -153,6 +153,5 @@ private:
     std::condition_variable execCond;
     std::condition_variable queryCond;
 };
-
 
 #endif //C__11_TEST_SQLCONNECTIONPOOLSHAREDMUTEX_H

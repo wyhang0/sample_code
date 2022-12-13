@@ -7,9 +7,9 @@
 
 #include <string>
 #include <vector>
-#include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
+#include <memory>
 #include <boost/pfr.hpp>
+#include <cxxabi.h>
 
 #include "../src/sqlite_cpp.h"
 
@@ -24,6 +24,13 @@ public:
 
     bool commit();
 
+    bool prepare(string sql);
+
+    template<class Struct>
+    bool executeStruct(Struct &&st, int startIndex = 0){
+        return db.executeStruct(std::forward<Struct>(st), startIndex);
+    }
+
     bool execute(string sql);
 
     int getLastErrorCode();
@@ -33,14 +40,14 @@ public:
     bool queryCountSql(int &count, string sql);
 
     template<class Struct>
-    bool querySql(std::vector<boost::shared_ptr<Struct>> &vecObjs, string sql){
-        cout << sql << endl;
+    bool querySql(std::vector<std::shared_ptr<Struct>> &vecObjs, string sql){
+        cout << dbName << ":\t" << sql << endl;
         do{
             if(!db.query(sql)){
                 break;
             }
             while(db.next()){
-                auto st = boost::make_shared<Struct>();
+                auto st = std::make_shared<Struct>();
                 SqlQueryBindValues::sqlQueryBindValues(db, st);
                 vecObjs.push_back(st);
             }
@@ -48,6 +55,28 @@ public:
         }while(false);
 
         return false;
+    }
+
+    template<class Struct>
+    bool queryOneObjSql(std::shared_ptr<Struct> &obj, string sql){
+        cout << dbName << ":\t" << sql << endl;
+        bool result = false;
+        do{
+            if(!db.query(sql)){
+                break;
+            }
+            while(db.next()){
+                if(!result){
+                    if(!obj){
+                        obj = std::make_shared<Struct>();
+                    }
+                    SqlQueryBindValues::sqlQueryBindValues(db, obj);
+                    result = true;
+                }
+            }
+        }while(false);
+
+        return result;
     }
 
 private:
@@ -67,14 +96,14 @@ private:
     class SqlQueryBindValues{
     public:
         template<typename Struct>
-        static void sqlQueryBindValues(SqliteCpp &db, boost::shared_ptr<Struct> st){
+        static void sqlQueryBindValues(SqliteCpp &db, std::shared_ptr<Struct> st){
             using Index = typename MakeIndexes<boost::pfr::tuple_size_v<Struct>>::type;
             __sqlQueryBindValues(Index{}, db, st);
         }
 
     private:
         template<int ...Indexes, typename Struct>
-        static void __sqlQueryBindValues(IndexSeq<Indexes...> &&, SqliteCpp &db, boost::shared_ptr<Struct> st){
+        static void __sqlQueryBindValues(IndexSeq<Indexes...> &&, SqliteCpp &db, std::shared_ptr<Struct> st){
             auto func = [](auto &&key, auto &&value){
                 key = value;
             };
@@ -84,6 +113,7 @@ private:
 
 private:
     SqliteCpp db;
+    string dbName;
 };
 
 

@@ -11,6 +11,9 @@
 #include <typeinfo>
 #include <iostream>
 
+#include <boost/filesystem.hpp>
+#include <boost/pfr.hpp>
+
 #include "../sqlite3-cmake-master/src/sqlite3.h"
 #include "./non_copyable.h"
 
@@ -20,7 +23,7 @@ struct blob
 {
     const char *pBuf;
     size_t size;
-    
+
     // sql获取blob数据后转换为string防止sqlite3_stmt重置后，pBuf指向非法内存
     string toString(){
         return {pBuf, size};
@@ -38,6 +41,10 @@ public:
     }
 
     bool open(const string &fileName){
+        auto dir = boost::filesystem::path(fileName).parent_path().string();
+        if(!boost::filesystem::exists(dir)){
+            boost::filesystem::create_directories(dir);
+        }
         if(sqlite3_threadsafe() != SQLITE_CONFIG_MULTITHREAD){
             sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
         }
@@ -47,8 +54,12 @@ public:
 
         m_code = sqlite3_open(fileName.c_str(), &m_dbHandle);
 
-        sqlite3_exec(m_dbHandle, "PRAGMA foreign_keys = 1;", 0,0,0);
-        sqlite3_exec(m_dbHandle, "PRAGMA auto_vacuum = 0;", 0,0,0);
+        if(m_code == SQLITE_OK){
+            sqlite3_exec(m_dbHandle, "PRAGMA foreign_keys = 1;", 0,0,0);
+            sqlite3_exec(m_dbHandle, "PRAGMA auto_vacuum = 0;", 0,0,0);
+        }else{
+            m_dbHandle = nullptr;
+        }
 
         return m_code == SQLITE_OK;
     }
@@ -95,8 +106,23 @@ public:
     }
 
     bool prepare(const string &sql){
+        if(m_statement){
+            m_code = sqlite3_finalize(m_statement);
+            if(m_code != SQLITE_OK)
+                return false;
+            m_statement = nullptr;
+        }
         m_code = sqlite3_prepare_v2(m_dbHandle, sql.c_str(), -1, &m_statement, NULL);
         return m_code == SQLITE_OK;
+    }
+
+    template<class Struct>
+    bool executeStruct(Struct &&st, int startIndex){
+        if(SqlInsertBindValues::sqlInsertBindValues(this, std::forward<Struct>(st), startIndex) != SQLITE_OK)
+            return false;
+        m_code = sqlite3_step(m_statement);
+        sqlite3_reset(m_statement);
+        return m_code == SQLITE_DONE;
     }
 
     template<typename ...Args>
@@ -201,6 +227,7 @@ protected:
     R columnValue(int index){
         if(sqlite3_column_type(m_statement, index) != SQLITE_FLOAT){
             cout << __FILE__ << " " << __LINE__ << ": type error" << endl;
+            while(next());
             throw bad_cast();
         }
 
@@ -209,8 +236,9 @@ protected:
     template<typename R, typename enable_if<is_integral<R>::value>::type* = nullptr>
     R columnValue(int index){
         int type = sqlite3_column_type(m_statement, index);
-        if(sqlite3_column_type(m_statement, index) != SQLITE_INTEGER){
+        if(type != SQLITE_INTEGER){
             cout << __FILE__ << " " << __LINE__ << ": type error" << endl;
+            while(next());
             throw bad_cast();
         }
 
@@ -229,6 +257,7 @@ protected:
         auto type = sqlite3_column_type(m_statement, index);
         if(type != SQLITE_TEXT && type != SQLITE_BLOB){
             cout << __FILE__ << " " << __LINE__ << ": type error" << endl;
+            while(next());
             throw bad_cast();
         }
 
@@ -241,6 +270,7 @@ protected:
         auto type = sqlite3_column_type(m_statement, index);
         if(type != SQLITE_BLOB && type != SQLITE_TEXT){
             cout << __FILE__ << " " << __LINE__ << ": type error" << endl;
+            while(next());
             throw bad_cast();
         }
 
@@ -248,6 +278,44 @@ protected:
         size_t size = sqlite3_column_bytes(m_statement, index);
         return blob{(char*)tmp, size};
     }
+
+private:
+    template<int...>
+    struct IndexSeq{};
+
+    template<int N, int...Indexes>
+    struct MakeIndexes{
+        using type = typename MakeIndexes<N - 1, N - 1, Indexes...>::type;
+    };
+
+    template<int...Indexes>
+    struct MakeIndexes<0, Indexes...>{
+        using type = IndexSeq<Indexes...>;
+    };
+
+    class SqlInsertBindValues{
+    public:
+        template<typename Struct>
+        static int sqlInsertBindValues(SqliteCpp *db, Struct &&st, int startIndex){
+            using Index = typename MakeIndexes<boost::pfr::tuple_size<typename std::remove_reference<Struct>::type>::value>::type;
+            return __sqlInsertBindValues(Index{}, db, forward<decltype(st)>(st), startIndex);
+        }
+
+    private:
+        template<typename T>
+        static void init(SqliteCpp *db, int index, T &&t, int &value, int startIndex){
+            if(value == SQLITE_OK && index >= startIndex){
+                db->bindParams(index - startIndex + 1, t);
+            }
+        }
+
+        template<int ...Indexes, typename Struct>
+        static int __sqlInsertBindValues(IndexSeq<Indexes...> &&, SqliteCpp *db,  Struct &&st, int startIndex){
+            int value = SQLITE_OK;
+            std::initializer_list<int>{(init(db, Indexes, boost::pfr::get<Indexes>(st), value, startIndex),0)...};
+            return value;
+        }
+    };
 
 private:
     sqlite3 *m_dbHandle{nullptr};

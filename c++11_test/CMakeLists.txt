@@ -19,6 +19,6 @@ foreach(FILE ${FILES})
     target_link_libraries(${TARGET} pthread)
 endforeach()
 
-target_link_libraries(test_sqlite_cpp sqlite3 pthread dl)
+target_link_libraries(test_sqlite_cpp sqlite3 pthread dl boost_filesystem)
 
 

@@ -45,7 +45,7 @@ int main(){
         do{
             srand(time(nullptr));
 
-            auto sqlConnectionPool = boost::make_shared<SqlConnectionPoolSharedMutex<SqlConnectionSqlite> >(5, "School.db");
+            auto sqlConnectionPool = std::make_shared<SqlConnectionPoolSharedMutex<SqlConnectionSqlite> >(5, "./School.db");
             //create table
             {
                 auto execute = sqlConnectionPool->getExecuteConnection();
@@ -54,7 +54,7 @@ int main(){
                     string sql = R"(CREATE TABLE if not exists "School" (
                             "id"	INTEGER NOT NULL,
                             "name"	TEXT NOT NULL,
-                            "addr"	INTEGER NOT NULL,
+                            "addr"	TEXT NOT NULL,
                             "phone"	INTEGER NOT NULL,
                             PRIMARY KEY("id")
                         ))";
@@ -84,35 +84,58 @@ int main(){
             {
                 auto executeFunc = [sqlConnectionPool](){
                     SqlStatementConstructor sqlStatementConstructor;
-                    for (int i = 0; i < 500; ++i) {
+//                    for (int i = 0; i < 10; ++i) {
+//                        auto execute = sqlConnectionPool->getExecuteConnection();
+//                        if(!execute)
+//                            continue;
+//                        cout << this_thread::get_id() << " exec" << endl;
+//                        execute->begin();
+//                        for (int i = 0, j = 1; i < 500; ++i) {
+//                            School school;
+//                            school.id = random();
+//                            school.name = to_string(j++);
+//                            school.addr = j++;
+//                            school.phone = j++;
+//
+//                            Student student;
+//                            student.id = random();
+//                            student.name = to_string(j++);
+//                            student.addr = to_string(j++);
+//                            student.phone = j++;
+//                            student.schoolId = school.id;
+//
+//                            if(!execute->execute(sqlStatementConstructor.insertOrReplaceSqlStr(school))){
+//                                cout << execute->getLastError() << endl;
+//                                execute->rollBack();
+//                                break;
+//                            }
+//                            if(!execute->execute(sqlStatementConstructor.insertOrReplaceSqlStr(student))){
+//                                cout << execute->getLastError() << endl;
+//                                execute->rollBack();
+//                                break;
+//                            }
+//                        }
+//                        execute->commit();
+//                    }
+                    for (int i = 0; i < 10; ++i) {
                         auto execute = sqlConnectionPool->getExecuteConnection();
                         if(!execute)
                             continue;
                         cout << this_thread::get_id() << " exec" << endl;
                         execute->begin();
-                        for (int i = 0, j = 1; i < 5; ++i) {
-                            School school;
-                            school.id = random();
-                            school.name = to_string(j++);
-                            school.addr = j++;
-                            school.phone = j++;
+                        if(execute->prepare(sqlStatementConstructor.insertOrReplaceSqlPrepareStr<School>())){
+                            for (int i = 0, j = 1; i < 500; ++i) {
+                                School school;
+                                school.id = random();
+                                school.name = to_string(j++);
+                                school.addr = to_string(j++);
+                                school.phone = j++;
 
-                            Student student;
-                            student.id = random();
-                            student.name = to_string(j++);
-                            student.addr = to_string(j++);
-                            student.phone = j++;
-                            student.schoolId = school.id;
-
-                            if(!execute->execute(sqlStatementConstructor.insertOrReplaceSqlStr(school))){
-                                cout << execute->getLastError() << endl;
-                                execute->rollBack();
-                                break;
-                            }
-                            if(!execute->execute(sqlStatementConstructor.insertOrReplaceSqlStr(student))){
-                                cout << execute->getLastError() << endl;
-                                execute->rollBack();
-                                break;
+                                if(!execute->executeStruct(school)){
+                                    cout << execute->getLastError() << endl;
+                                    execute->rollBack();
+                                    break;
+                                }
                             }
                         }
                         execute->commit();
@@ -121,18 +144,18 @@ int main(){
                 auto queryFunc = [sqlConnectionPool](){
                     SqlStatementConstructor sqlStatementConstructor;
                     for (int i = 0; i < 500; ++i) {
-                        vector<boost::shared_ptr<Student>> studentV;
-                        vector<boost::shared_ptr<School>> schoolV;
+                        vector<std::shared_ptr<Student>> studentV;
+                        vector<std::shared_ptr<School>> schoolV;
 
                         auto query = sqlConnectionPool->getQueryConnection();
                         if(!query)
                             continue;
                         cout << this_thread::get_id() << " query" << endl;
-                        if(!query->querySql(schoolV, sqlStatementConstructor.selectSqlStr<School>(sqlStatementConstructor.sqlQueryAndConditions("like", "name", "%12%")))){
+                        if(!query->querySql(schoolV, sqlStatementConstructor.selectSqlStr<School>({sqlStatementConstructor.sqlQueryAndConditions("like", "name", "%12%")}))){
                             cout << "err: " << query->getLastError() << endl;
                             break;
                         }
-                        if(!query->querySql(studentV, sqlStatementConstructor.selectSqlStr<Student>(sqlStatementConstructor.sqlQueryAndConditions("like", "id", "%12")))){
+                        if(!query->querySql(studentV, sqlStatementConstructor.selectSqlStr<Student>({sqlStatementConstructor.sqlQueryAndConditions("like", "id", "%12")}))){
                             cout << "err: " << query->getLastError() << endl;
                             break;
                         }
@@ -152,7 +175,7 @@ int main(){
             }
             cout << endl;
         }while(false);
-
+        return 0;
     }
     {
         do{
@@ -214,33 +237,33 @@ int main(){
             }
             conn.commit();
 
-            if(!conn.execute(sqlStatementConstructor.deleteSqlStr<School>(sqlStatementConstructor.sqlQueryAndConditions("=", "id", 1, "name", "2")))){
+            if(!conn.execute(sqlStatementConstructor.deleteSqlStr<School>({sqlStatementConstructor.sqlQueryAndConditions("=", "id", 1, "name", "2")}))){
                 cout << "err: " << conn.getLastError() << conn.getLastErrorCode() << endl;
                 break;
             }
 
-            if(!conn.execute(sqlStatementConstructor.deleteSqlStr<School>(sqlStatementConstructor.sqlQueryOrConditions("=", "id", 1, "id", "22")))){
+            if(!conn.execute(sqlStatementConstructor.deleteSqlStr<School>({sqlStatementConstructor.sqlQueryOrConditions("=", "id", 1, "id", "22")}))){
                 cout << "err: " << conn.getLastError() << conn.getLastErrorCode() << endl;
                 break;
             }
 
-            vector<boost::shared_ptr<Student>> studentV;
-            vector<boost::shared_ptr<School>> schoolV;
-            if(!conn.querySql(studentV, sqlStatementConstructor.selectSqlStr<Student>(""))){
+            vector<std::shared_ptr<Student>> studentV;
+            vector<std::shared_ptr<School>> schoolV;
+            if(!conn.querySql(studentV, sqlStatementConstructor.selectSqlStr<Student>({}))){
                 cout << "err: " << conn.getLastError() << endl;
                 break;
             }
-            if(!conn.querySql(schoolV, sqlStatementConstructor.selectSqlStr<School>(sqlStatementConstructor.sqlQueryAndConditions("like", "name", "%12%")))){
+            if(!conn.querySql(schoolV, sqlStatementConstructor.selectSqlStr<School>({sqlStatementConstructor.sqlQueryAndConditions("like", "name", "%12%")}))){
                 cout << "err: " << conn.getLastError() << endl;
                 break;
             }
-            if(!conn.querySql(schoolV, sqlStatementConstructor.selectSqlStr<School>(""))){
+            if(!conn.querySql(schoolV, sqlStatementConstructor.selectSqlStr<School>({}))){
                 cout << "err: " << conn.getLastError() << endl;
                 break;
             }
 
             int count;
-            if(!conn.queryCountSql(count, sqlStatementConstructor.selectCountSqlStr<School>(sqlStatementConstructor.sqlQueryAndConditions(">", "id", 1)))){
+            if(!conn.queryCountSql(count, sqlStatementConstructor.selectCountSqlStr<School>({sqlStatementConstructor.sqlQueryAndConditions(">", "id", 1)}))){
                 cout << "err: " << conn.getLastError() << endl;
                 break;
             }
