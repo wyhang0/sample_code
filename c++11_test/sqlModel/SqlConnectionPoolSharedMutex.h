@@ -53,31 +53,31 @@ public:
             }
 
             if(sharedTimedMutex.try_lock_for(std::chrono::milliseconds(millSeconds))){
-                if(sqlConnections.empty()){
-                    sharedTimedMutex.unlock();
-                }else{
-                    std::shared_ptr<SqlConnection> tmp;
+                std::shared_ptr<SqlConnection> tmp;
+                {
+                    std::lock_guard<std::mutex> locker(this->mutex);
+                    if(sqlConnections.empty()){
+                        sharedTimedMutex.unlock();
+                        break;
+                    }
+                    tmp = sqlConnections.front();
+                    sqlConnections.pop();
+                }
+                auto mirror = this->shared_from_this();
+                return std::shared_ptr<SqlConnection>(tmp.get(), [mirror, this](SqlConnection *p){
                     {
                         std::lock_guard<std::mutex> locker(this->mutex);
-                        tmp = sqlConnections.front();
-                        sqlConnections.pop();
-                    }
-                    auto mirror = this->shared_from_this();
-                    return std::shared_ptr<SqlConnection>(tmp.get(), [mirror, this](SqlConnection *p){
-                        {
-                            std::lock_guard<std::mutex> locker(this->mutex);
-                            sqlConnections.push(std::shared_ptr<SqlConnection>(p, [](SqlConnection *p) {}));
-                            sharedTimedMutex.unlock();
-                            //释放完写锁计数减一
-                            getExecuteConnectionCount--;
-                            if(getExecuteConnectionCount > 0){
-                                execCond.notify_one();
-                            }else{
-                                queryCond.notify_all();
-                            }
+                        sqlConnections.push(std::shared_ptr<SqlConnection>(p, [](SqlConnection *p) {}));
+                        sharedTimedMutex.unlock();
+                        //释放完写锁计数减一
+                        getExecuteConnectionCount--;
+                        if(getExecuteConnectionCount > 0){
+                            execCond.notify_one();
+                        }else{
+                            queryCond.notify_all();
                         }
-                    });
-                }
+                    }
+                });
             }
         }while(false);
 
@@ -111,29 +111,29 @@ public:
             }
 
             if(sharedTimedMutex.try_lock_shared_for(std::chrono::milliseconds(millSeconds))){
-                if(sqlConnections.empty()){
-                    sharedTimedMutex.unlock_shared();
-                }else{
-                    std::shared_ptr<SqlConnection> tmp;
+                std::shared_ptr<SqlConnection> tmp;
+                {
+                    std::lock_guard<std::mutex> locker(this->mutex);
+                    if(sqlConnections.empty()){
+                        sharedTimedMutex.unlock_shared();
+                        break;
+                    }
+                    tmp = sqlConnections.front();
+                    sqlConnections.pop();
+                }
+                auto mirror = this->shared_from_this();
+                return std::shared_ptr<SqlConnection>(tmp.get(), [mirror, this](SqlConnection *p){
                     {
                         std::lock_guard<std::mutex> locker(this->mutex);
-                        tmp = sqlConnections.front();
-                        sqlConnections.pop();
-                    }
-                    auto mirror = this->shared_from_this();
-                    return std::shared_ptr<SqlConnection>(tmp.get(), [mirror, this](SqlConnection *p){
-                        {
-                            std::lock_guard<std::mutex> locker(this->mutex);
-                            sqlConnections.push(std::shared_ptr<SqlConnection>(p, [](SqlConnection *p) {}));
-                            sharedTimedMutex.unlock_shared();
-                            if(getExecuteConnectionCount > 0){
-                                execCond.notify_one();
-                            }else{
-                                queryCond.notify_all();
-                            }
+                        sqlConnections.push(std::shared_ptr<SqlConnection>(p, [](SqlConnection *p) {}));
+                        sharedTimedMutex.unlock_shared();
+                        if(getExecuteConnectionCount > 0){
+                            execCond.notify_one();
+                        }else{
+                            queryCond.notify_all();
                         }
-                    });
-                }
+                    }
+                });
             }
         }while(false);
 
