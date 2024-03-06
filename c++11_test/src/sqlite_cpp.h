@@ -116,6 +116,7 @@ public:
         return m_code == SQLITE_OK;
     }
 
+    //32位系统中使用时，Struct中属性有int64_t类型时，其他int类型升级为int64_t
     template<class Struct>
     bool executeStruct(Struct &&st, int startIndex){
         if(SqlInsertBindValues::sqlInsertBindValues(this, std::forward<Struct>(st), startIndex) != SQLITE_OK)
